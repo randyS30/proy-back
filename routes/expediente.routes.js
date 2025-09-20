@@ -26,10 +26,10 @@ const router = Router();
 
 // CRUD
 router.get("/", authRequired, listarExpedientes);
-router.post("/", authRequired, requireRole(["admin", "abogado"]), upload.single("archivo"),crearExpediente);
+router.post("/", authRequired, requireRole(["Admin", "abogado"]), upload.single("archivo"),crearExpediente);
 router.get("/:id", authRequired, obtenerExpediente);
-router.put("/:id", authRequired, requireRole(["admin", "abogado"]), actualizarExpediente);
-router.delete("/:id", authRequired, requireRole(["admin"]), eliminarExpediente);
+router.put("/:id", authRequired, requireRole(["Admin", "abogado"]), actualizarExpediente);
+router.delete("/:id", authRequired, requireRole(["Admin"]), eliminarExpediente);
 
 // IA
 router.post("/:id/analizar", authRequired, analizarExpediente);
@@ -37,13 +37,13 @@ router.post("/archivos/:id/analizar", authRequired, analizarArchivo);
 
 // 📌 Eventos
 router.get("/:id/eventos", authRequired, listarEventos);
-router.post("/:id/eventos", authRequired, requireRole(["admin", "abogado"]), crearEvento);
+router.post("/:id/eventos", authRequired, requireRole(["Admin", "abogado"]), crearEvento);
 router.put("/eventos/:eventoId", authRequired, actualizarEvento);
 router.delete("/eventos/:eventoId", authRequired, eliminarEvento);
 
 // 📌 Reportes
 router.get("/:id/reportes", authRequired, listarReportes);
-router.post("/:id/reportes", authRequired, requireRole(["admin", "abogado"]), crearReporte);
+router.post("/:id/reportes", authRequired, requireRole(["Admin", "abogado"]), crearReporte);
 router.put("/reportes/:reporteId", authRequired, actualizarReporte);
 router.delete("/reportes/:reporteId", authRequired, eliminarReporte);
 

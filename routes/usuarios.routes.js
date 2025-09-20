@@ -10,9 +10,9 @@ import { authRequired, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/", authRequired, requireRole(["admin"]), listarUsuarios);
-router.post("/", authRequired, requireRole(["admin"]), crearUsuario);
-router.put("/:id", authRequired, requireRole(["admin"]), actualizarUsuario);
-router.delete("/:id", authRequired, requireRole(["admin"]), eliminarUsuario);
+router.get("/", authRequired, requireRole(["Admin"]), listarUsuarios);
+router.post("/", authRequired, requireRole(["Admin"]), crearUsuario);
+router.put("/:id", authRequired, requireRole(["Admin"]), actualizarUsuario);
+router.delete("/:id", authRequired, requireRole(["Admin"]), eliminarUsuario);
 
 export default router;
