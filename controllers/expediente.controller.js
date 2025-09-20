@@ -14,28 +14,59 @@ export const listarExpedientes = async (req, res) => {
 
 export const crearExpediente = async (req, res) => {
   try {
-    const { demandante, demandado, fecha_inicio, creado_por, estado } = req.body;
+    // id del usuario que hace la petición
+    const creadoPor = req.user?.id || null; // authRequired ya mete req.user
 
-    // Generar número expediente automáticamente: EXP-AÑO-0001
+    // campos enviados desde el front
+    const {
+      demandante_doc,
+      demandante,
+      fecha_nacimiento,
+      direccion,
+      demandado_doc,
+      demandado,
+      estado,
+      fecha_inicio
+    } = req.body;
+
+    // Validación simple
+    if (!demandante_doc || !demandante || !demandado_doc || !demandado || !estado || !fecha_inicio) {
+      return fail(res, 400, "Faltan campos obligatorios");
+    }
+
+    // generar número de expediente aquí
     const year = new Date().getFullYear();
-    const result = await pool.query(
-      "SELECT COUNT(*) FROM expedientes WHERE EXTRACT(YEAR FROM creado_en) = $1",
-      [year]
-    );
-    const count = parseInt(result.rows[0].count) + 1;
-    const numero_expediente = `EXP-${year}-${String(count).padStart(4, "0")}`;
+    const sec = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, "0");
+    const numero_expediente = `EXP-${year}-${sec}`;
 
-    const r = await pool.query(
-      `INSERT INTO expedientes (numero_expediente, demandante, demandado, fecha_inicio, creado_por, estado, creado_en)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
-      [numero_expediente, demandante, demandado, fecha_inicio, creado_por, estado]
-    );
+    const query = `
+      INSERT INTO expedientes 
+      (numero_expediente, demandante_doc, demandante, fecha_nacimiento, direccion, demandado_doc, demandado, estado, fecha_inicio, creado_por, creado_en)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) 
+      RETURNING *`;
+    const values = [
+      numero_expediente,
+      demandante_doc,
+      demandante,
+      fecha_nacimiento,
+      direccion,
+      demandado_doc,
+      demandado,
+      estado,
+      fecha_inicio,
+      creadoPor
+    ];
+
+    const r = await pool.query(query, values);
 
     ok(res, { expediente: r.rows[0] });
   } catch (err) {
     fail(res, 500, err.message);
   }
 };
+
 
 export const obtenerExpediente = async (req, res) => {
   try {
