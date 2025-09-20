@@ -14,6 +14,9 @@ export const listarExpedientes = async (req, res) => {
 
 export const crearExpediente = async (req, res) => {
   try {
+
+    console.log(req.body); // campos texto
+    console.log(req.file); //archivo
     const { numero_expediente, demandante, demandado, fecha_inicio, creado_por } = req.body;
     const r = await pool.query(
       `INSERT INTO expedientes (numero_expediente, demandante, demandado, fecha_inicio, creado_por, creado_en)

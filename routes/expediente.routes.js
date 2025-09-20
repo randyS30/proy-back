@@ -26,7 +26,7 @@ const router = Router();
 
 // CRUD
 router.get("/", authRequired, listarExpedientes);
-router.post("/", authRequired, requireRole(["admin", "abogado"]), crearExpediente);
+router.post("/", authRequired, requireRole(["admin", "abogado"]), upload.single("archivo"),crearExpediente);
 router.get("/:id", authRequired, obtenerExpediente);
 router.put("/:id", authRequired, requireRole(["admin", "abogado"]), actualizarExpediente);
 router.delete("/:id", authRequired, requireRole(["admin"]), eliminarExpediente);
