@@ -4,7 +4,7 @@ import {
   crearReporte,
   actualizarReporte,
   eliminarReporte
-} from "../controllers/reportes.controller.js";
+} from "../controllers/reporte.controller.js";
 import { authRequired } from "../middleware/auth.js";
 
 const router = Router();
