@@ -15,10 +15,6 @@ router.get("/expedientes/:id/eventos", authRequired, listarEventos);
 // Crear evento para un expediente
 router.post("/expedientes/:id/eventos", authRequired, crearEvento);
 
-// Editar evento
-router.put("/eventos/:id", authRequired, editarEvento);
-
-// Eliminar evento
-router.delete("/eventos/:id", authRequired, eliminarEvento);
-
+router.put("/:id", authRequired, editarEvento);
+router.delete("/:id", authRequired, eliminarEvento);
 export default router;

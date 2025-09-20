@@ -14,39 +14,43 @@ export const listarEventos = async (req, res) => {
   }
 };
 
-// Crear nuevo evento
-export const crearEvento = async (req, res) => {
-  try {
-    const { descripcion, fecha } = req.body || {};
-    const creadoPor = req.user?.id || null;
-
-    const r = await pool.query(
-      `INSERT INTO eventos (expediente_id, descripcion, fecha, creado_por)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.params.id, descripcion, fecha, creadoPor]
-    );
-    ok(res, { evento: r.rows[0] });
-  } catch (err) {
-    fail(res, 500, err.message);
-  }
-};
-
 // Editar evento
 export const editarEvento = async (req, res) => {
   try {
-    const { descripcion, fecha } = req.body || {};
+    const { tipo_evento, descripcion, fecha_evento } = req.body || {};
     const { id } = req.params;
 
     const r = await pool.query(
-      "UPDATE eventos SET descripcion=$1, fecha=$2 WHERE id=$3 RETURNING *",
-      [descripcion, fecha, id]
+      `UPDATE eventos 
+       SET tipo_evento=$1, descripcion=$2, fecha_evento=$3 
+       WHERE id=$4 RETURNING *`,
+      [tipo_evento, descripcion, fecha_evento, id]
     );
+
     if (r.rowCount === 0) return fail(res, 404, "Evento no encontrado");
     ok(res, { evento: r.rows[0] });
   } catch (err) {
     fail(res, 500, err.message);
   }
 };
+
+// Crear evento (si quieres que guarde tipo_evento también)
+export const crearEvento = async (req, res) => {
+  try {
+    const { tipo_evento, descripcion, fecha_evento } = req.body || {};
+    const creadoPor = req.user?.id || null;
+
+    const r = await pool.query(
+      `INSERT INTO eventos (expediente_id, tipo_evento, descripcion, fecha_evento, creado_en)
+       VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+      [req.params.id, tipo_evento, descripcion, fecha_evento]
+    );
+    ok(res, { evento: r.rows[0] });
+  } catch (err) {
+    fail(res, 500, err.message);
+  }
+};
+
 
 // Eliminar evento
 export const eliminarEvento = async (req, res) => {
