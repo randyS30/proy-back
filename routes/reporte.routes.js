@@ -11,7 +11,6 @@ const router = Router();
 
 router.get("/expedientes/:id/reportes", authRequired, listarReportes);
 router.post("/expedientes/:id/reportes", authRequired, crearReporte);
-router.put("/reportes/:id", authRequired, actualizarReporte);
-router.delete("/reportes/:id", authRequired, eliminarReporte);
-
+router.put("/:id", authRequired, actualizarReporte);
+router.delete("/:id", authRequired, eliminarReporte);
 export default router;
