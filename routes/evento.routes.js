@@ -1,13 +1,24 @@
 import { Router } from "express";
-import { listarEventos, crearEvento, editarEvento, eliminarEvento } from "../controllers/evento.controller.js";
-import { authRequired } from "../middleware/auth.js";
+import {
+  listarEventos,
+  crearEvento,
+  editarEvento,
+  eliminarEvento,
+} from "../controllers/evento.controller.js";
+import { authRequired } from "../middleware/auth.js"; // si usas auth
 
 const router = Router();
 
-// Backend eventos
+// Listar eventos de un expediente
 router.get("/expedientes/:id/eventos", authRequired, listarEventos);
+
+// Crear evento para un expediente
 router.post("/expedientes/:id/eventos", authRequired, crearEvento);
-router.put("/evento/:id",authRequired, editarEvento);       // asegúrate de tener esta ruta
-router.delete("/evento/:id",authRequired, eliminarEvento);  // asegúrate de tener esta ruta
+
+// Editar evento
+router.put("/eventos/:id", authRequired, editarEvento);
+
+// Eliminar evento
+router.delete("/eventos/:id", authRequired, eliminarEvento);
 
 export default router;
