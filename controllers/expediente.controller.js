@@ -14,15 +14,23 @@ export const listarExpedientes = async (req, res) => {
 
 export const crearExpediente = async (req, res) => {
   try {
+    const { demandante, demandado, fecha_inicio, creado_por, estado } = req.body;
 
-    console.log(req.body); // campos texto
-    console.log(req.file); //archivo
-    const { numero_expediente, demandante, demandado, fecha_inicio, creado_por } = req.body;
-    const r = await pool.query(
-      `INSERT INTO expedientes (numero_expediente, demandante, demandado, fecha_inicio, creado_por, creado_en)
-       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
-      [numero_expediente, demandante, demandado, fecha_inicio, creado_por]
+    // Generar número expediente automáticamente: EXP-AÑO-0001
+    const year = new Date().getFullYear();
+    const result = await pool.query(
+      "SELECT COUNT(*) FROM expedientes WHERE EXTRACT(YEAR FROM creado_en) = $1",
+      [year]
     );
+    const count = parseInt(result.rows[0].count) + 1;
+    const numero_expediente = `EXP-${year}-${String(count).padStart(4, "0")}`;
+
+    const r = await pool.query(
+      `INSERT INTO expedientes (numero_expediente, demandante, demandado, fecha_inicio, creado_por, estado, creado_en)
+       VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
+      [numero_expediente, demandante, demandado, fecha_inicio, creado_por, estado]
+    );
+
     ok(res, { expediente: r.rows[0] });
   } catch (err) {
     fail(res, 500, err.message);
