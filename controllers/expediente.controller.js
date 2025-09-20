@@ -3,11 +3,60 @@ import { ok, fail } from "../utils/response.js";
 import { leerContenidoArchivo, callAISystem } from "../utils/ia.js";
 
 
+// controllers/expediente.controller.js  -> reemplazar listarExpedientes
 export const listarExpedientes = async (req, res) => {
   try {
-    const r = await pool.query("SELECT * FROM expedientes ORDER BY creado_en DESC");
+    const { q: rawQ, estado, from, to } = req.query;
+    const q = rawQ ? rawQ.trim() : null;
+
+    const where = [];
+    const values = [];
+    let idx = 1;
+
+    if (q) {
+      // buscar en número, demandante o demandado (case-insensitive)
+      where.push(
+        `(exp.numero_expediente ILIKE '%' || $${idx} || '%' OR exp.demandante ILIKE '%' || $${idx} || '%' OR exp.demandado ILIKE '%' || $${idx} || '%')`
+      );
+      values.push(q);
+      idx++;
+    }
+
+    if (estado) {
+      where.push(`exp.estado = $${idx}`);
+      values.push(estado);
+      idx++;
+    }
+
+    if (from) {
+      where.push(`exp.fecha_inicio >= $${idx}`);
+      values.push(from);
+      idx++;
+    }
+
+    if (to) {
+      where.push(`exp.fecha_inicio <= $${idx}`);
+      values.push(to);
+      idx++;
+    }
+
+    const sql = `
+      SELECT exp.*,
+             COALESCE(u.nombre, exp.creado_por) AS creado_por_nombre
+      FROM expedientes exp
+      LEFT JOIN usuarios u
+        ON (u.id::text = exp.creado_por OR u.email = exp.creado_por)
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      ORDER BY exp.creado_en DESC
+    `;
+
+    // debug log opcional (quita en prod si no quieres logs)
+    console.log("listarExpedientes params:", { q, estado, from, to, values });
+
+    const r = await pool.query(sql, values);
     ok(res, { expedientes: r.rows });
   } catch (err) {
+    console.error("listarExpedientes error:", err);
     fail(res, 500, err.message);
   }
 };
