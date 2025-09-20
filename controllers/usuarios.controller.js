@@ -3,7 +3,7 @@ import pool from "../config/db.js";
 import bcrypt from "bcryptjs";
 import { ok, fail } from "../utils/response.js";
 
-const VALID_ROLES = ["Abogado", "Admin", "asistente"];
+const VALID_ROLES = ["Abogado", "Admin", "Asistente"];
 
 export const crearUsuario = async (req, res) => {
   try {
