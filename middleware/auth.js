@@ -15,7 +15,7 @@ export const authRequired = (req, res, next) => {
 };
 
 export const requireRole = (roles = []) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.rol)) {
+  if (!req.user || !roles.map(r=>r.toLowerCase()).includes(req.user.rol.toLowerCase())) {
     return res.status(403).json({ success: false, message: "No tienes permisos" });
   }
   next();

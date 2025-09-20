@@ -11,7 +11,7 @@ export const crearUsuario = async (req, res) => {
     if (!nombre || !email || !password) return fail(res, 400, "Faltan campos");
 
     // normalizar / fallback rol
-    if (!rol || !VALID_ROLES.includes(rol)) rol = "Abogado";
+    if (!rol || !VALID_ROLES.includes(rol)) rol = "Admin";
 
     const hash = await bcrypt.hash(password, 10);
     const r = await pool.query(
