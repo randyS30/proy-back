@@ -31,6 +31,7 @@ export const crearReporte = async (req, res) => {
   }
 };
 
+// Editar reporte
 export const actualizarReporte = async (req, res) => {
   try {
     const { contenido } = req.body;
@@ -45,6 +46,7 @@ export const actualizarReporte = async (req, res) => {
   }
 };
 
+// Eliminar reporte
 export const eliminarReporte = async (req, res) => {
   try {
     const r = await pool.query("DELETE FROM reportes WHERE id=$1 RETURNING *", [req.params.id]);
@@ -54,4 +56,3 @@ export const eliminarReporte = async (req, res) => {
     fail(res, 500, err.message);
   }
 };
-
