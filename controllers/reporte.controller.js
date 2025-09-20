@@ -16,30 +16,26 @@ export const listarReportes = async (req, res) => {
 
 // Crear reporte
 export const crearReporte = async (req, res) => {
-  console.log("DEBUG crearReporte - req.user:", req.user);
-  console.log("DEBUG crearReporte - req.body:", req.body);
-
   try {
-    const { contenido } = req.body;
+    const { contenido } = req.body || {};
+    const generadoPor = req.user?.id || null; // igual que creadoPor en eventos
 
-    if (!contenido) {
-      return fail(res, 400, "Falta el campo 'contenido'");
-    }
-
-    const generadoBy = req.user?.id || null;
+    // Validación mínima
+    if (!contenido) return fail(res, 400, "Falta contenido del reporte");
 
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1, $2, $3, NOW()) RETURNING *`,
-      [req.params.id, contenido, generadoBy]
+      [req.params.id, contenido, generadoPor]
     );
 
     ok(res, { reporte: r.rows[0] });
   } catch (err) {
-    console.error("ERROR crearReporte:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("ERROR crearReporte:", err.message); // log para debug
+    fail(res, 500, err.message);
   }
 };
+
 
 
 // Editar reporte
