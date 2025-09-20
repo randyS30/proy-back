@@ -16,10 +16,11 @@ export const listarReportes = async (req, res) => {
 
 // Crear reporte
 export const crearReporte = async (req, res) => {
+  console.log("User:", req.user);
+  console.log("Body:", req.body);
   try {
     const { contenido } = req.body;
     const generadoBy = req.user?.id || null;
-
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1,$2,$3,NOW()) RETURNING *`,
@@ -27,9 +28,11 @@ export const crearReporte = async (req, res) => {
     );
     ok(res, { reporte: r.rows[0] });
   } catch (err) {
+    console.error(err);
     fail(res, 500, err.message);
   }
 };
+
 
 // Editar reporte
 export const actualizarReporte = async (req, res) => {
