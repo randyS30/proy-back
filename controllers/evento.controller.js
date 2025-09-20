@@ -23,3 +23,26 @@ export const crearEvento = async (req, res) => {
     fail(res, 500, err.message);
   }
 };
+export const editarEvento = async (req, res) => {
+  try {
+    const { descripcion, fecha } = req.body;
+    const { id } = req.params;
+    const r = await pool.query(
+      "UPDATE eventos SET descripcion=$1, fecha=$2 WHERE id=$3 RETURNING *",
+      [descripcion, fecha, id]
+    );
+    ok(res, { evento: r.rows[0] });
+  } catch (err) {
+    fail(res, 500, err.message);
+  }
+};
+
+export const eliminarEvento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM eventos WHERE id=$1", [id]);
+    ok(res, { message: "Evento eliminado" });
+  } catch (err) {
+    fail(res, 500, err.message);
+  }
+};
