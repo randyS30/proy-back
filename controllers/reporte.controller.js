@@ -5,45 +5,56 @@ import { ok, fail } from "../utils/response.js";
 export const listarReportes = async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT r.*, u.nombre AS generado_por FROM reportes r LEFT JOIN usuarios u ON r.generado_por=u.id WHERE expediente_id=$1 ORDER BY generado_en DESC",
+      `SELECT r.*, u.nombre AS generado_por_nombre
+       FROM reportes r
+       LEFT JOIN usuarios u ON r.generado_por = u.id
+       WHERE expediente_id=$1
+       ORDER BY generado_en DESC`,
       [req.params.id]
     );
     ok(res, { reportes: r.rows });
   } catch (err) {
     fail(res, 500, err.message);
-  } 
+  }
 };
+
 
 // Crear reporte
 export const crearReporte = async (req, res) => {
   try {
-    console.log("crearReporte params.id:", req.params.id);
-    console.log("crearReporte body:", req.body);
-    console.log("crearReporte user:", req.user);
-
     const { contenido } = req.body || {};
     const generadoPor = req.user?.id || null;
 
-    // Validación mínima
     if (!contenido) return fail(res, 400, "Falta contenido del reporte");
 
     const expedienteId = parseInt(req.params.id, 10);
-    if (isNaN(expedienteId)) {
-      return fail(res, 400, "ID de expediente inválido");
-    }
+    if (isNaN(expedienteId)) return fail(res, 400, "ID de expediente inválido");
 
+    // Insertar el reporte
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1, $2, $3, NOW()) RETURNING *`,
       [expedienteId, contenido, generadoPor]
     );
 
-    ok(res, { reporte: r.rows[0] });
+    const nuevo = r.rows[0];
+
+    // Buscar nombre del usuario
+    let generadoPorNombre = null;
+    if (nuevo.generado_por) {
+      const u = await pool.query("SELECT nombre FROM usuarios WHERE id=$1", [
+        nuevo.generado_por,
+      ]);
+      generadoPorNombre = u.rows[0]?.nombre || null;
+    }
+
+    ok(res, { reporte: { ...nuevo, generado_por_nombre: generadoPorNombre } });
   } catch (err) {
-    console.error("ERROR crearReporte:", err.message); // log para debug
+    console.error("ERROR crearReporte:", err.message);
     fail(res, 500, err.message);
   }
 };
+
 
 
 
