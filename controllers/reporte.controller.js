@@ -19,40 +19,37 @@ export const listarReportes = async (req, res) => {
 };
 
 
-// Crear reporte
 export const crearReporte = async (req, res) => {
   try {
-    console.log("👉 req.user recibido del token:", req.user); // 👈 DEBUG
-
     const { contenido } = req.body || {};
-    const generadoPor = parseInt(req.user?.id, 10) || null;
+    const generadoPor = Number(req.user?.id);
 
     if (!contenido) return fail(res, 400, "Falta contenido del reporte");
+    if (!Number.isInteger(generadoPor)) {
+      return fail(res, 400, "ID de usuario inválido en el token");
+    }
 
     const expedienteId = parseInt(req.params.id, 10);
     if (isNaN(expedienteId)) return fail(res, 400, "ID de expediente inválido");
 
-    // Insertamos el reporte
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1, $2, $3, NOW())
-       RETURNING id, expediente_id, contenido, generado_por, generado_en`,
+       RETURNING *`,
       [expedienteId, contenido, generadoPor]
     );
 
     const nuevo = r.rows[0];
 
-    let generadoPorNombre = null;
-    if (nuevo.generado_por) {
-      const u = await pool.query("SELECT nombre FROM usuarios WHERE id=$1", [
-        nuevo.generado_por,
-      ]);
-      generadoPorNombre = u.rows[0]?.nombre || null;
-    }
+    //  traer el nombre del usuario en la respuesta
+    const u = await pool.query("SELECT nombre FROM usuarios WHERE id=$1", [
+      nuevo.generado_por,
+    ]);
+    const generadoPorNombre = u.rows[0]?.nombre || null;
 
     ok(res, { reporte: { ...nuevo, generado_por_nombre: generadoPorNombre } });
   } catch (err) {
-    console.error("❌ ERROR crearReporte:", err.message);
+    console.error("ERROR crearReporte:", err.message);
     fail(res, 500, err.message);
   }
 };
