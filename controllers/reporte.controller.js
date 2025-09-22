@@ -11,7 +11,7 @@ export const listarReportes = async (req, res) => {
     ok(res, { reportes: r.rows });
   } catch (err) {
     fail(res, 500, err.message);
-  }
+  } 
 };
 
 // Crear reporte
@@ -24,7 +24,7 @@ export const crearReporte = async (req, res) => {
     if (!contenido) return fail(res, 400, "Falta contenido del reporte");
 
     const r = await pool.query(
-      `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
+      `INSERT INTO reportes (expediente_id, contenido, generado_por_nombre, generado_en)
        VALUES ($1, $2, $3, NOW()) RETURNING *`,
       [req.params.id, contenido, generadoPor]
     );
