@@ -35,19 +35,21 @@ export const crearReporte = async (req, res) => {
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1, $2, $3, NOW())
-       RETURNING *`,
+       RETURNING id, expediente_id, contenido, generado_por, generado_en`,
       [expedienteId, contenido, generadoPor]
     );
 
     const nuevo = r.rows[0];
 
-    //  traer el nombre del usuario en la respuesta
-    const u = await pool.query("SELECT nombre FROM usuarios WHERE id=$1", [
-      nuevo.generado_por,
-    ]);
-    const generadoPorNombre = u.rows[0]?.nombre || null;
+    const q = await pool.query(
+      `SELECT r.*, u.nombre AS generado_por_nombre
+       FROM reportes r
+       LEFT JOIN usuarios u ON r.generado_por = u.id
+       WHERE r.id = $1`,
+      [nuevo.id]
+    );
 
-    ok(res, { reporte: { ...nuevo, generado_por_nombre: generadoPorNombre } });
+    ok(res, { reporte: q.rows[0] });
   } catch (err) {
     console.error("ERROR crearReporte:", err.message);
     fail(res, 500, err.message);
