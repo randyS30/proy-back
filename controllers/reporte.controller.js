@@ -5,7 +5,7 @@ import { ok, fail } from "../utils/response.js";
 export const listarReportes = async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT r.*, u.nombre AS creado_por_nombre FROM reportes r LEFT JOIN usuarios u ON r.generado_por=u.id WHERE expediente_id=$1 ORDER BY generado_en DESC",
+      "SELECT r.*, u.nombre AS generado_por FROM reportes r LEFT JOIN usuarios u ON r.generado_por=u.id WHERE expediente_id=$1 ORDER BY generado_en DESC",
       [req.params.id]
     );
     ok(res, { reportes: r.rows });
