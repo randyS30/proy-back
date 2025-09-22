@@ -23,23 +23,24 @@ export const listarReportes = async (req, res) => {
 export const crearReporte = async (req, res) => {
   try {
     const { contenido } = req.body || {};
-    const generadoPor = req.user?.id || null;
+    const generadoPor = parseInt(req.user?.id, 10) || null; // 🔹 Guardamos solo el ID numérico
 
     if (!contenido) return fail(res, 400, "Falta contenido del reporte");
 
     const expedienteId = parseInt(req.params.id, 10);
     if (isNaN(expedienteId)) return fail(res, 400, "ID de expediente inválido");
 
-    // Insertar el reporte
+    // Insertamos el reporte con el ID del usuario
     const r = await pool.query(
       `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
-       VALUES ($1, $2, $3, NOW()) RETURNING *`,
+       VALUES ($1, $2, $3, NOW())
+       RETURNING id, expediente_id, contenido, generado_por, generado_en`,
       [expedienteId, contenido, generadoPor]
     );
 
     const nuevo = r.rows[0];
 
-    // Buscar nombre del usuario
+    // 🔹 Buscamos el nombre del usuario a partir del ID (consulta aparte)
     let generadoPorNombre = null;
     if (nuevo.generado_por) {
       const u = await pool.query("SELECT nombre FROM usuarios WHERE id=$1", [
@@ -48,14 +49,18 @@ export const crearReporte = async (req, res) => {
       generadoPorNombre = u.rows[0]?.nombre || null;
     }
 
-    ok(res, { reporte: { ...nuevo, generado_por_nombre: generadoPorNombre } });
+    // Respondemos con el ID + nombre
+    ok(res, { 
+      reporte: { 
+        ...nuevo, 
+        generado_por_nombre: generadoPorNombre 
+      } 
+    });
   } catch (err) {
     console.error("ERROR crearReporte:", err.message);
     fail(res, 500, err.message);
   }
 };
-
-
 
 
 
