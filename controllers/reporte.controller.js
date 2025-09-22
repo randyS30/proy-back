@@ -17,16 +17,25 @@ export const listarReportes = async (req, res) => {
 // Crear reporte
 export const crearReporte = async (req, res) => {
   try {
+    console.log("crearReporte params.id:", req.params.id);
+    console.log("crearReporte body:", req.body);
+    console.log("crearReporte user:", req.user);
+
     const { contenido } = req.body || {};
-    const generadoPor = req.user?.id || null; // igual que creadoPor en eventos
+    const generadoPor = req.user?.id || null;
 
     // Validación mínima
     if (!contenido) return fail(res, 400, "Falta contenido del reporte");
 
+    const expedienteId = parseInt(req.params.id, 10);
+    if (isNaN(expedienteId)) {
+      return fail(res, 400, "ID de expediente inválido");
+    }
+
     const r = await pool.query(
-      `INSERT INTO reportes (expediente_id, contenido, generado_por_nombre, generado_en)
+      `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
        VALUES ($1, $2, $3, NOW()) RETURNING *`,
-      [req.params.id, contenido, generadoPor]
+      [expedienteId, contenido, generadoPor]
     );
 
     ok(res, { reporte: r.rows[0] });
@@ -35,6 +44,7 @@ export const crearReporte = async (req, res) => {
     fail(res, 500, err.message);
   }
 };
+
 
 
 
