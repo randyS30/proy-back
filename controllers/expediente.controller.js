@@ -1,9 +1,32 @@
 import pool from "../config/db.js";
 import { ok, fail } from "../utils/response.js";
 import { leerContenidoArchivo, callAISystem } from "../utils/ia.js";
+import fs from "fs";
+import path from "path";
+import { uploadDir } from "../config/multer.js";
 
+// ===================================
+// LISTA DE ARCHIVOS PREPARADOS
+// ===================================
+// Coloca los nombres de archivo exactos que pusiste en tu carpeta /uploads
+const archivosPreparados = [
+  { 
+    filename: "PREPARADO_DEMANDA.pdf",    // Nombre en la carpeta /uploads
+    original: "Demanda Oficial (Presentada).pdf" // Nombre que verá el usuario
+  },
+  { 
+    filename: "PREPARADO_SENTENCIA.pdf",   
+    original: "Sentencia de Primera Instancia.pdf" 
+  },
+  { 
+    filename: "PREPARADO_APELACION.pdf",  
+    original: "Recurso de Apelación.pdf" 
+  },
+  // Agrega más si lo necesitas
+];
 
-// controllers/expediente.controller.js  -> reemplazar listarExpedientes
+// --- FUNCIONES DE EXPEDIENTE ---
+
 export const listarExpedientes = async (req, res) => {
   try {
     const { q: rawQ, estado, from, to } = req.query;
@@ -14,7 +37,6 @@ export const listarExpedientes = async (req, res) => {
     let idx = 1;
 
     if (q) {
-      // buscar en número, demandante o demandado (case-insensitive)
       where.push(
         `(exp.numero_expediente ILIKE '%' || $${idx} || '%' OR exp.demandante ILIKE '%' || $${idx} || '%' OR exp.demandado ILIKE '%' || $${idx} || '%')`
       );
@@ -50,7 +72,6 @@ export const listarExpedientes = async (req, res) => {
       ORDER BY exp.creado_en DESC
     `;
 
-    // debug log opcional (quita en prod si no quieres logs)
     console.log("listarExpedientes params:", { q, estado, from, to, values });
 
     const r = await pool.query(sql, values);
@@ -63,10 +84,8 @@ export const listarExpedientes = async (req, res) => {
 
 export const crearExpediente = async (req, res) => {
   try {
-    // id del usuario que hace la petición
-    const creadoPor = req.user?.id || null; // authRequired ya mete req.user
+    const creadoPor = req.user?.id || null; 
 
-    // campos enviados desde el front
     const {
       demandante_doc,
       demandante,
@@ -78,12 +97,10 @@ export const crearExpediente = async (req, res) => {
       fecha_inicio
     } = req.body;
 
-    // Validación simple
     if (!demandante_doc || !demandante || !demandado_doc || !demandado || !estado || !fecha_inicio) {
       return fail(res, 400, "Faltan campos obligatorios");
     }
 
-    // generar número de expediente aquí
     const year = new Date().getFullYear();
     const sec = Math.floor(Math.random() * 10000)
       .toString()
@@ -115,7 +132,6 @@ export const crearExpediente = async (req, res) => {
     fail(res, 500, err.message);
   }
 };
-
 
 export const obtenerExpediente = async (req, res) => {
   try {
@@ -150,40 +166,6 @@ export const eliminarExpediente = async (req, res) => {
   }
 };
 
-// =======================
-// 🔎 Analizar expediente completo
-// =======================
-/* export const analizarExpediente = async (req, res) => {
-  try {
-    const expedienteId = parseInt(req.params.id);
-    const archivos = await pool.query("SELECT * FROM archivos WHERE expediente_id=$1", [expedienteId]);
-    if (archivos.rows.length === 0)
-      return fail(res, 400, "No hay archivos para analizar");
-
-    let contenido = "";
-    for (const archivo of archivos.rows) {
-      const absPath = path.join(uploadDir, archivo.archivo_path);
-      const texto = await leerContenidoArchivo(absPath, archivo.tipo_mime, archivo.nombre_original);
-      contenido += `\n--- ${archivo.nombre_original} ---\n${texto}`;
-    }
-
-    const aiResult = await callAISystem(
-      "Eres un abogado peruano experto en cese de alimentos.",
-      contenido
-    );
-
-    const insert = await pool.query(
-      `INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en)
-       VALUES ($1,$2,$3,NOW()) RETURNING *`,
-      [expedienteId, aiResult, req.user?.id || null]
-    );
-
-    ok(res, { reporte: insert.rows[0] });
-  } catch (err) {
-    fail(res, 500, "Error analizando expediente");
-  }
-}; */
-// ================= ANALIZAR CON IA =================
 export const analizarExpediente = async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,7 +178,6 @@ export const analizarExpediente = async (req, res) => {
 
     const resultado = await callAISystem(prompt, contenido);
 
-    // Guardar como reporte
     const reporte = await pool.query(
       "INSERT INTO reportes (expediente_id, contenido, generado_por, generado_en) VALUES ($1, $2, $3, NOW()) RETURNING *",
       [id, resultado, req.user?.email || "sistema"]
@@ -208,7 +189,8 @@ export const analizarExpediente = async (req, res) => {
   }
 };
 
-// ================= EVENTOS =================
+// --- FUNCIONES DE EVENTOS ---
+
 export const listarEventos = async (req, res) => {
   try {
     const { id } = req.params;
@@ -256,7 +238,8 @@ export const eliminarEvento = async (req, res) => {
   }
 };
 
-// ================= REPORTES =================
+// --- FUNCIONES DE REPORTES ---
+
 export const listarReportes = async (req, res) => {
   try {
     const { id } = req.params;
@@ -304,7 +287,9 @@ export const eliminarReporte = async (req, res) => {
   }
 };
 
-// ================= ARCHIVOS =================
+// --- FUNCIONES DE ARCHIVOS ---
+// Estas funciones son llamadas por 'expediente.routes.js'
+
 export const listarArchivos = async (req, res) => {
   try {
     const { id } = req.params;
@@ -317,25 +302,101 @@ export const listarArchivos = async (req, res) => {
 
 export const subirArchivos = async (req, res) => {
   try {
-    const { id } = req.params;
-    const archivos = [];
-    for (let f of req.files) {
-      const r = await pool.query(
-        "INSERT INTO archivos (expediente_id, nombre_original, ruta, mime_type, subido_por, subido_en) VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING *",
-        [id, f.originalname, f.path, f.mimetype, req.user?.email || "sistema"]
-      );
-      archivos.push(r.rows[0]);
+    const { id: expedienteId } = req.params;
+    const subidoPor = req.body.subido_por || req.user?.id || '1';
+
+    if (!req.files || req.files.length === 0) {
+      return fail(res, 400, "No se adjuntó ningún archivo.");
     }
-    ok(res, { archivos });
+
+    // --- Lógica del Mago de Oz ---
+    // 1. Borramos los archivos "brutos" que subió el usuario
+    for (const f of req.files) {
+      try {
+        fs.unlinkSync(f.path);
+      } catch (e) {
+        console.warn(`No se pudo borrar el archivo bruto: ${f.path}`);
+      }
+    }
+
+    // 2. Obtenemos cuántos archivos "preparados" ya hemos asignado a este expediente
+    const countResult = await pool.query(
+      "SELECT count(*) FROM archivos WHERE expediente_id = $1 AND archivo_path LIKE 'PREPARADO_%'",
+      [expedienteId]
+    );
+    let archivosAsignados = parseInt(countResult.rows[0].count, 10);
+
+    const archivosInsertados = [];
+
+    // 3. Asignamos los siguientes archivos preparados
+    // (Incluso si el usuario sube 3 archivos brutos, solo asignamos 1 preparado por clic)
+    const archivoPreparado = archivosPreparados[archivosAsignados % archivosPreparados.length];
+
+    if (!archivoPreparado) {
+       return fail(res, 404, "No se encontró un archivo preparado para asignar.");
+    }
+
+    // 4. Verificamos que el archivo preparado exista físicamente
+    const preparadoPath = path.join(uploadDir, archivoPreparado.filename);
+    if (!fs.existsSync(preparadoPath)) {
+      console.error(`Error crítico: El archivo preparado ${archivoPreparado.filename} no existe en ${uploadDir}`);
+      return fail(res, 500, `El archivo preparado ${archivoPreparado.filename} no se encuentra en el servidor.`);
+    }
+
+    // 5. Insertamos el archivo PREPARADO en la base de datos
+    const r = await pool.query(
+      `INSERT INTO archivos (
+        expediente_id, 
+        nombre_original, 
+        archivo_path, 
+        tipo_mime, 
+        subido_por, 
+        subido_en
+      ) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+      [
+        expedienteId,
+        archivoPreparado.original, // El nombre bonito (ej: "Demanda Oficial.pdf")
+        archivoPreparado.filename, // El nombre físico (ej: "PREPARADO_DEMANDA.pdf")
+        "application/pdf",
+        subidoPor
+      ]
+    );
+    
+    archivosInsertados.push(r.rows[0]);
+
+    ok(res, { archivos: archivosInsertados });
+    
   } catch (err) {
+    console.error("Error en subirArchivos:", err.message);
     fail(res, 500, err.message);
   }
 };
 
 export const eliminarArchivo = async (req, res) => {
   try {
-    await pool.query("DELETE FROM archivos WHERE id=$1", [req.params.archivoId]);
-    ok(res, { message: "Archivo eliminado" });
+    // Esta función está en expediente.controller.js pero es llamada por 
+    // la ruta /api/archivos/:archivoId, así que la lógica debe estar aquí
+    // o en archivo.controller.js. La dejamos aquí para consistencia.
+    const { archivoId } = req.params;
+    
+    const r = await pool.query("DELETE FROM archivos WHERE id=$1 RETURNING *", [archivoId]);
+    if (r.rows.length === 0) return fail(res, 404, "Archivo no encontrado");
+
+    const archivoBorrado = r.rows[0];
+
+    // No borramos el archivo físico si es uno "preparado"
+    if (!archivoBorrado.archivo_path.startsWith("PREPARADO_")) {
+      const filePath = path.join(uploadDir, archivoBorrado.archivo_path);
+      if (fs.existsSync(filePath)) {
+        try { 
+          fs.unlinkSync(filePath); 
+        } catch (e) { 
+          console.warn("No se pudo borrar archivo físico:", e.message); 
+        }
+      }
+    }
+
+    ok(res, { archivo: archivoBorrado });
   } catch (err) {
     fail(res, 500, err.message);
   }
@@ -343,12 +404,15 @@ export const eliminarArchivo = async (req, res) => {
 
 export const analizarArchivo = async (req, res) => {
   try {
-    const { archivoId } = req.params;
+    const { archivoId } = req.params; // Viene de expediente.routes.js
+    
     const r = await pool.query("SELECT * FROM archivos WHERE id=$1", [archivoId]);
     if (r.rows.length === 0) return fail(res, 404, "No encontrado");
 
     const archivo = r.rows[0];
-    const contenido = await leerContenidoArchivo(archivo.ruta, archivo.mime_type, archivo.nombre_original);
+    const absPath = path.join(uploadDir, archivo.archivo_path); // archivo_path es 'PREPARADO_DEMANDA.pdf'
+
+    const contenido = await leerContenidoArchivo(absPath, archivo.tipo_mime, archivo.nombre_original);
     const prompt = `Haz un resumen jurídico breve de este archivo`;
     const resultado = await callAISystem(prompt, contenido);
 

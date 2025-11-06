@@ -1,44 +1,28 @@
 import { Router } from "express";
-import { subirArchivos, listarArchivos, descargarArchivo, eliminarArchivo } from "../controllers/archivo.controller.js";
+// Importamos las funciones del controlador de *archivos*
+import { 
+  descargarArchivo, 
+  eliminarArchivo 
+} from "../controllers/archivo.controller.js";
+// Importamos la función de analizar del controlador de *expedientes*
+import { analizarArchivo } from "../controllers/expediente.controller.js"; 
 import { authRequired } from "../middleware/auth.js";
-import { upload } from "../config/multer.js";
+// No necesitamos 'upload' aquí
 
 const router = Router();
 
-router.post("/:id/archivos", authRequired, upload.array("archivos", 20), subirArchivos);
-router.get("/:id/archivos", authRequired, listarArchivos);
+// Ruta de Descarga: GET /api/archivos/:id/download
+// Tu frontend la llama como: `${API}/api/archivos/${ar.id}/download`
+// PERO tu ruta en archivo.routes.js dice "/:id/download"
+// Asumiré que tu 'server.js' monta esto en '/api/archivos'
 router.get("/:id/download", authRequired, descargarArchivo);
+
+// Ruta de Eliminación: DELETE /api/archivos/:id
+// Tu frontend la llama como: `${API}/api/archivos/${id}`
 router.delete("/:id", authRequired, eliminarArchivo);
 
-
-router.post("/:id/analizar", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const r = await pool.query("SELECT * FROM archivos WHERE id=$1", [id]);
-    if (r.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Archivo no encontrado" });
-    }
-
-    const archivo = r.rows[0];
-    const filePath = `uploads/${archivo.nombre_guardado}`;
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: "Archivo no existe físicamente" });
-    }
-
-    const analisis = await analizarArchivoIA(filePath, archivo.nombre_original);
-
-    // 👉 Guardar el reporte en la BD
-    const result = await pool.query(
-      "INSERT INTO reportes (expediente_id, contenido, generado_por) VALUES ($1, $2, $3) RETURNING *",
-      [archivo.expediente_id, analisis, "IA"]
-    );
-
-    res.json({ success: true, reporte: result.rows[0] });
-  } catch (err) {
-    console.error("Error analizando archivo:", err);
-    res.status(500).json({ success: false, message: "Error en análisis IA" });
-  }
-});
+// Ruta de Análisis: POST /api/expedientes/archivos/:id/analizar
+// Esta ruta no pertenece aquí según tu frontend.
+// La ruta correcta está en expediente.routes.js
 
 export default router;
