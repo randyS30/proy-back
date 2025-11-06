@@ -7,7 +7,7 @@ import { ok, fail } from "../utils/response.js";
 export const subirArchivos = async (req, res) => {
   try {
     const expedienteId = parseInt(req.params.id);
-    const subidoPor = req.user ? req.user.id : (req.body.subido_por || null);
+    const subidoPor = req.user ? req.user.id : 1;
 
     const results = [];
     for (const f of req.files) {
