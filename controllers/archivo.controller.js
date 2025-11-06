@@ -5,23 +5,32 @@ import { uploadDir } from "../config/multer.js";
 import { ok, fail } from "../utils/response.js";
 
 export const subirArchivos = async (req, res) => {
-  try {
-    const expedienteId = parseInt(req.params.id);
-    const subidoPor = req.user ? req.user.id : 1;
+  try {
+    const expedienteId = parseInt(req.params.id);
 
-    const results = [];
-    for (const f of req.files) {
-      const inserted = await pool.query(
-        `INSERT INTO archivos (expediente_id, nombre_original, archivo_path, tipo_mime, subido_por, subido_en)
-         VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING *`,
-        [expedienteId, f.originalname, f.filename, f.mimetype, subidoPor]
-      );
-      results.push(inserted.rows[0]);
-    }
-    ok(res, { archivos: results });
-  } catch (err) {
-    fail(res, 500, err.message);
-  }
+    // 1. CORRECCIÓN CRÍTICA DE LÓGICA
+    // Si req.user no existe (autenticación fallida/incompleta), 
+    // usamos el valor que envías en el body (req.body.subido_por, que debe ser "1"),
+    // o un fallback numérico simple (1) como última opción.
+    const subidoPor = req.user 
+        ? req.user.id 
+        : req.body.subido_por || '1'; // Usamos '1' como valor de respaldo
+
+    const results = [];
+    for (const f of req.files) {
+      const inserted = await pool.query(
+        `INSERT INTO archivos (expediente_id, nombre_original, archivo_path, tipo_mime, subido_por, subido_en)
+         VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING *`,
+        [expedienteId, f.originalname, f.filename, f.mimetype, subidoPor]
+      );
+      results.push(inserted.rows[0]);
+    }
+    ok(res, { archivos: results });
+  } catch (err) {
+    // 2. CORRECCIÓN DE DEBUGGING: Imprimir el error para verlo en Railway Logs
+    console.error("Error crítico al subir archivo (detalles):", err);
+    fail(res, 500, err.message);
+  }
 };
 
 export const listarArchivos = async (req, res) => {
