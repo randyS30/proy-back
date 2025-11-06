@@ -5,14 +5,17 @@ import fs from "fs";
 import path from "path";
 import { uploadDir } from "../config/multer.js";
 
-// ===================================
-// LISTA DE ARCHIVOS PREPARADOS
-// ===================================
-// Coloca los nombres de archivo exactos que pusiste en tu carpeta /uploads
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function getRandomDelay(minMs, maxMs) {
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+}
+
 const archivosPreparados = [
   { 
-    filename: "PREPARADO_DEMANDA.pdf",    // Nombre en la carpeta /uploads
-    original: "Demanda Oficial (Presentada).pdf" // Nombre que verá el usuario
+    filename: "PREPARADO_DEMANDA.pdf",    
+    original: "Demanda Oficial (Presentada).pdf" 
   },
   { 
     filename: "PREPARADO_SENTENCIA.pdf",   
@@ -24,8 +27,6 @@ const archivosPreparados = [
   },
   // Agrega más si lo necesitas
 ];
-
-// --- FUNCIONES DE EXPEDIENTE ---
 
 export const listarExpedientes = async (req, res) => {
   try {
@@ -302,15 +303,23 @@ export const listarArchivos = async (req, res) => {
 
 export const subirArchivos = async (req, res) => {
   try {
+
+    const delayAleatorio = getRandomDelay(45000, 90000); 
+
+
+    console.log(`Iniciando Mago de Oz. Espera aleatoria de ${delayAleatorio / 1000} segundos...`);
+
+    await delay(delayAleatorio);
+
     const { id: expedienteId } = req.params;
     const subidoPor = req.body.subido_por || req.user?.id || '1';
 
     if (!req.files || req.files.length === 0) {
+      console.log("Subida fallida: No se adjuntó ningún archivo.");
       return fail(res, 400, "No se adjuntó ningún archivo.");
     }
 
-    // --- Lógica del Mago de Oz ---
-    // 1. Borramos los archivos "brutos" que subió el usuario
+
     for (const f of req.files) {
       try {
         fs.unlinkSync(f.path);
@@ -319,64 +328,64 @@ export const subirArchivos = async (req, res) => {
       }
     }
 
-    // 2. Obtenemos cuántos archivos "preparados" ya hemos asignado a este expediente
+   
     const countResult = await pool.query(
       "SELECT count(*) FROM archivos WHERE expediente_id = $1 AND archivo_path LIKE 'PREPARADO_%'",
       [expedienteId]
     );
     let archivosAsignados = parseInt(countResult.rows[0].count, 10);
+    console.log(`Este expediente ya tiene ${archivosAsignados} archivos preparados.`);
 
     const archivosInsertados = [];
 
-    // 3. Asignamos los siguientes archivos preparados
-    // (Incluso si el usuario sube 3 archivos brutos, solo asignamos 1 preparado por clic)
-    const archivoPreparado = archivosPreparados[archivosAsignados % archivosPreparados.length];
+    if (archivosAsignados >= archivosPreparados.length) {
+      console.warn("Se acabaron los archivos preparados. Reiniciando el ciclo.");
+      archivosAsignados = 0; 
+    }
+
+    const archivoPreparado = archivosPreparados[archivosAsignados];
 
     if (!archivoPreparado) {
-       return fail(res, 404, "No se encontró un archivo preparado para asignar.");
+       console.error("Error crítico: La lista 'archivosPreparados' está vacía.");
+       return fail(res, 500, "Error del servidor: no hay archivos preparados configurados.");
     }
+    console.log(`Asignando archivo preparado: ${archivoPreparado.filename}`);
 
-    // 4. Verificamos que el archivo preparado exista físicamente
+ 
     const preparadoPath = path.join(uploadDir, archivoPreparado.filename);
     if (!fs.existsSync(preparadoPath)) {
-      console.error(`Error crítico: El archivo preparado ${archivoPreparado.filename} no existe en ${uploadDir}`);
-      return fail(res, 500, `El archivo preparado ${archivoPreparado.filename} no se encuentra en el servidor.`);
+      const errorMsg = `El archivo preparado ${archivoPreparado.filename} no se encuentra en ${uploadDir}`;
+      console.error(errorMsg);
+      return fail(res, 500, errorMsg);
     }
 
-    // 5. Insertamos el archivo PREPARADO en la base de datos
     const r = await pool.query(
       `INSERT INTO archivos (
-        expediente_id, 
-        nombre_original, 
-        archivo_path, 
-        tipo_mime, 
-        subido_por, 
-        subido_en
+        expediente_id, nombre_original, archivo_path, tipo_mime, subido_por, subido_en
       ) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
       [
         expedienteId,
-        archivoPreparado.original, // El nombre bonito (ej: "Demanda Oficial.pdf")
-        archivoPreparado.filename, // El nombre físico (ej: "PREPARADO_DEMANDA.pdf")
+        archivoPreparado.original,
+        archivoPreparado.filename,
         "application/pdf",
         subidoPor
       ]
     );
     
     archivosInsertados.push(r.rows[0]);
+    console.log(`Éxito. Archivo ${archivoPreparado.original} insertado en la BD.`);
 
     ok(res, { archivos: archivosInsertados });
     
   } catch (err) {
-    console.error("Error en subirArchivos:", err.message);
+    console.error("Error crítico en subirArchivos:", err.message, err.stack);
     fail(res, 500, err.message);
   }
 };
 
 export const eliminarArchivo = async (req, res) => {
   try {
-    // Esta función está en expediente.controller.js pero es llamada por 
-    // la ruta /api/archivos/:archivoId, así que la lógica debe estar aquí
-    // o en archivo.controller.js. La dejamos aquí para consistencia.
+
     const { archivoId } = req.params;
     
     const r = await pool.query("DELETE FROM archivos WHERE id=$1 RETURNING *", [archivoId]);
@@ -384,7 +393,6 @@ export const eliminarArchivo = async (req, res) => {
 
     const archivoBorrado = r.rows[0];
 
-    // No borramos el archivo físico si es uno "preparado"
     if (!archivoBorrado.archivo_path.startsWith("PREPARADO_")) {
       const filePath = path.join(uploadDir, archivoBorrado.archivo_path);
       if (fs.existsSync(filePath)) {
@@ -404,7 +412,7 @@ export const eliminarArchivo = async (req, res) => {
 
 export const analizarArchivo = async (req, res) => {
   try {
-    const { archivoId } = req.params; // Viene de expediente.routes.js
+    const { archivoId } = req.params; 
     
     const r = await pool.query("SELECT * FROM archivos WHERE id=$1", [archivoId]);
     if (r.rows.length === 0) return fail(res, 404, "No encontrado");
