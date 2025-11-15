@@ -9,7 +9,7 @@ import archivosRoutes from "./routes/archivo.routes.js";
 import reportesRoutes from "./routes/reporte.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import reniecRoutes from "./routes/reniec.routes.js";
-
+import alertaRoutes from "./routes/alerta.routes.js";
 dotenv.config();
 const app = express();
 app.use(cors());
@@ -24,6 +24,7 @@ app.use("/api/archivos", archivosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reniec", reniecRoutes);
+app.use("/api", alertaRoutes);
 
 // Root
 app.get("/", (req, res) => res.send("✅ Backend funcionando"));
