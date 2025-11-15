@@ -5,6 +5,18 @@ import fs from "fs";
 import path from "path";
 import { uploadDir } from "../config/multer.js";
 
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Error Fatal: Faltan las variables de entorno SUPABASE_URL o SUPABASE_KEY.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+const BUCKET_NAME = 'archivos-expedientes'; 
+
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -14,7 +26,7 @@ function getRandomDelay(minMs, maxMs) {
 
 const archivosPreparados = [
   { 
-    filename: "PREPARADO_DEMANDA.pdf",    
+    filename: "PREPARADO_DEMANDA.pdf",
     original: "Demanda Oficial (Presentada).pdf" 
   },
   { 
@@ -25,8 +37,8 @@ const archivosPreparados = [
     filename: "PREPARADO_APELACION.pdf",  
     original: "Recurso de Apelación.pdf" 
   },
-  // Agrega más si lo necesitas
 ];
+
 
 export const listarExpedientes = async (req, res) => {
   try {
@@ -190,7 +202,6 @@ export const analizarExpediente = async (req, res) => {
   }
 };
 
-// --- FUNCIONES DE EVENTOS ---
 
 export const listarEventos = async (req, res) => {
   try {
@@ -286,10 +297,9 @@ export const eliminarReporte = async (req, res) => {
   } catch (err) {
     fail(res, 500, err.message);
   }
-};
+};  
 
 // --- FUNCIONES DE ARCHIVOS ---
-// Estas funciones son llamadas por 'expediente.routes.js'
 
 export const listarArchivos = async (req, res) => {
   try {
@@ -301,64 +311,82 @@ export const listarArchivos = async (req, res) => {
   }
 };
 
+
 export const subirArchivos = async (req, res) => {
+  console.log("Iniciando 'subirArchivos' (Mago de Oz con Supabase)...");
+  
   try {
-
+    
     const delayAleatorio = getRandomDelay(45000, 90000); 
-
-
-    console.log(`Iniciando Mago de Oz. Espera aleatoria de ${delayAleatorio / 1000} segundos...`);
-
+    console.log(`Simulando conversión... espera de ${delayAleatorio / 1000}s`);
     await delay(delayAleatorio);
 
     const { id: expedienteId } = req.params;
     const subidoPor = req.body.subido_por || req.user?.id || '1';
 
     if (!req.files || req.files.length === 0) {
-      console.log("Subida fallida: No se adjuntó ningún archivo.");
       return fail(res, 400, "No se adjuntó ningún archivo.");
     }
 
-
+   
     for (const f of req.files) {
-      try {
-        fs.unlinkSync(f.path);
-      } catch (e) {
-        console.warn(`No se pudo borrar el archivo bruto: ${f.path}`);
-      }
+      try { fs.unlinkSync(f.path); } catch (e) { console.warn("No se pudo borrar archivo bruto"); }
     }
 
    
     const countResult = await pool.query(
-      "SELECT count(*) FROM archivos WHERE expediente_id = $1 AND archivo_path LIKE 'PREPARADO_%'",
-      [expedienteId]
+      "SELECT count(*) FROM archivos WHERE expediente_id = $1", [expedienteId]
     );
     let archivosAsignados = parseInt(countResult.rows[0].count, 10);
-    console.log(`Este expediente ya tiene ${archivosAsignados} archivos preparados.`);
-
-    const archivosInsertados = [];
-
-    if (archivosAsignados >= archivosPreparados.length) {
-      console.warn("Se acabaron los archivos preparados. Reiniciando el ciclo.");
-      archivosAsignados = 0; 
-    }
-
-    const archivoPreparado = archivosPreparados[archivosAsignados];
+    const proximoIndice = archivosAsignados % archivosPreparados.length;
+    const archivoPreparado = archivosPreparados[proximoIndice];
 
     if (!archivoPreparado) {
-       console.error("Error crítico: La lista 'archivosPreparados' está vacía.");
-       return fail(res, 500, "Error del servidor: no hay archivos preparados configurados.");
+       return fail(res, 500, "Error: 'archivosPreparados' está vacío.");
     }
-    console.log(`Asignando archivo preparado: ${archivoPreparado.filename}`);
 
- 
+
     const preparadoPath = path.join(uploadDir, archivoPreparado.filename);
     if (!fs.existsSync(preparadoPath)) {
-      const errorMsg = `El archivo preparado ${archivoPreparado.filename} no se encuentra en ${uploadDir}`;
+      const errorMsg = `El archivo plantilla ${archivoPreparado.filename} no se encuentra en ${uploadDir}`;
       console.error(errorMsg);
       return fail(res, 500, errorMsg);
     }
+    
 
+    const fileBuffer = fs.readFileSync(preparadoPath); 
+    console.log(`Plantilla leída: ${preparadoPath}`);
+
+
+    const nuevoNombreSupabase = `exp${expedienteId}-${Date.now()}-${archivoPreparado.filename}`;
+    
+    console.log(`Subiendo a Supabase como: ${nuevoNombreSupabase}`);
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from(BUCKET_NAME) 
+      .upload(nuevoNombreSupabase, fileBuffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false 
+      });
+
+    if (uploadError) {
+      console.error("Error de Supabase:", uploadError.message);
+      return fail(res, 500, `Error de Supabase: ${uploadError.message}`);
+    }
+    
+    console.log("Subida a Supabase exitosa.");
+
+   
+    const { data: publicUrlData } = supabase
+      .storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(uploadData.path);
+
+    const urlSupabase = publicUrlData.publicUrl;
+    console.log(`URL Pública: ${urlSupabase}`);
+    
+   
     const r = await pool.query(
       `INSERT INTO archivos (
         expediente_id, nombre_original, archivo_path, tipo_mime, subido_por, subido_en
@@ -366,16 +394,14 @@ export const subirArchivos = async (req, res) => {
       [
         expedienteId,
         archivoPreparado.original,
-        archivoPreparado.filename,
+        urlSupabase,              
         "application/pdf",
         subidoPor
       ]
     );
     
-    archivosInsertados.push(r.rows[0]);
-    console.log(`Éxito. Archivo ${archivoPreparado.original} insertado en la BD.`);
-
-    ok(res, { archivos: archivosInsertados });
+    console.log("Registro guardado en BD de Railway.");
+    ok(res, { archivos: [r.rows[0]] });
     
   } catch (err) {
     console.error("Error crítico en subirArchivos:", err.message, err.stack);
@@ -383,9 +409,9 @@ export const subirArchivos = async (req, res) => {
   }
 };
 
+
 export const eliminarArchivo = async (req, res) => {
   try {
-
     const { archivoId } = req.params;
     
     const r = await pool.query("DELETE FROM archivos WHERE id=$1 RETURNING *", [archivoId]);
@@ -393,14 +419,17 @@ export const eliminarArchivo = async (req, res) => {
 
     const archivoBorrado = r.rows[0];
 
-    if (!archivoBorrado.archivo_path.startsWith("PREPARADO_")) {
-      const filePath = path.join(uploadDir, archivoBorrado.archivo_path);
-      if (fs.existsSync(filePath)) {
-        try { 
-          fs.unlinkSync(filePath); 
-        } catch (e) { 
-          console.warn("No se pudo borrar archivo físico:", e.message); 
-        }
+    if (archivoBorrado.archivo_path.includes('supabase.co')) {
+      try {
+        const nombreArchivoSupabase = archivoBorrado.archivo_path.split('/').pop();
+        
+        console.log(`Borrando de Supabase: ${nombreArchivoSupabase}`);
+        await supabase.storage.from(BUCKET_NAME).remove([nombreArchivoSupabase]);
+        console.log(`Archivo borrado de Supabase.`);
+
+      } catch (e) {
+        console.warn("No se pudo borrar el archivo de Supabase:", e.message);
+    
       }
     }
 
@@ -410,6 +439,7 @@ export const eliminarArchivo = async (req, res) => {
   }
 };
 
+
 export const analizarArchivo = async (req, res) => {
   try {
     const { archivoId } = req.params; 
@@ -418,10 +448,14 @@ export const analizarArchivo = async (req, res) => {
     if (r.rows.length === 0) return fail(res, 404, "No encontrado");
 
     const archivo = r.rows[0];
-    const absPath = path.join(uploadDir, archivo.archivo_path); // archivo_path es 'PREPARADO_DEMANDA.pdf'
 
-    const contenido = await leerContenidoArchivo(absPath, archivo.tipo_mime, archivo.nombre_original);
-    const prompt = `Haz un resumen jurídico breve de este archivo`;
+ 
+    console.log(`Iniciando análisis (simulado) de: ${archivo.nombre_original}`);
+
+    const prompt = `Haz un resumen jurídico breve de este archivo: ${archivo.nombre_original}`;
+
+    const contenido = `(Análisis de IA pendiente de implementación para archivos en Supabase. El archivo está en: ${archivo.archivo_path})`; 
+    
     const resultado = await callAISystem(prompt, contenido);
 
     const reporte = await pool.query(
